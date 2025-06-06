@@ -1,10 +1,6 @@
-from flask import Request
+from flask import Flask, request, jsonify
 from vertexai.preview.generative_models import GenerativeModel
-import json, functions_framework, vertexai
-
-# import logging
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
+import json, vertexai
 
 def extract_json_from_markdown(text):
     cleaned = text.replace("```json", "").replace("```", "").strip()
@@ -34,7 +30,6 @@ def is_valid_genai_format(data: dict) -> bool:
     except Exception:
         return False
 
-
 class GeminiAnalyzeAPI:
     def __init__(self, project_id: str = "tqm-ai-sandbox", location: str = "us-central1"):
         vertexai.init(project=project_id, location=location)
@@ -51,16 +46,13 @@ class GeminiAnalyzeAPI:
                 }
             )
             json_data = extract_json_from_markdown(response.text)
-
             if not is_valid_genai_format(json_data):
                 raise Exception(json.dumps({
                     "status": "failed",
                     "status_code": 500,
                     "error": "Invalid GenAI output format"
                 }))
-
             return json_data
-
         except Exception as e:
             raise Exception(json.dumps({
                 "status": "failed",
@@ -68,13 +60,7 @@ class GeminiAnalyzeAPI:
                 "error": f"generate_and_parse_json: {str(e)}"
             }))
 
-    def handle_request(self, request: Request):
-        with open("system_prompt.txt", "r", encoding="utf-8") as f:
-            system_prompt = f.read()
-        with open("ai_prompt.txt", "r", encoding="utf-8") as f:
-            ai_prompt = f.read()
-
-        request_json = request.get_json()
+    def handle_request(self, request_json):
         if not request_json or "content" not in request_json:
             raise Exception(json.dumps({
                 "status": "failed",
@@ -82,6 +68,11 @@ class GeminiAnalyzeAPI:
                 "error": "content is required"
             }))
         content = request_json.get("content", "")
+
+        with open("system_prompt.txt", "r", encoding="utf-8") as f:
+            system_prompt = f.read()
+        with open("ai_prompt.txt", "r", encoding="utf-8") as f:
+            ai_prompt = f.read()
 
         full_prompt = f"""
 #SYSTEM
@@ -98,11 +89,16 @@ class GeminiAnalyzeAPI:
         result = self.generate_and_parse_json(full_prompt)
         return result
 
-@functions_framework.http
-def main(request: Request):
+# ---------- เพิ่ม Flask App ----------
+app = Flask(__name__)
+
+@app.route("/", methods=["POST"])
+def predict():
     try:
+        request_json = request.get_json()
         api = GeminiAnalyzeAPI()
-        result = api.handle_request(request)
-        return (json.dumps(result, ensure_ascii=False), 200, {"Content-Type": "application/json"})
+        result = api.handle_request(request_json)
+        return jsonify(result)
     except Exception as e:
-        return (str(e), 500, {"Content-Type": "application/json"})
+        # จะ return json error message
+        return str(e), 500
