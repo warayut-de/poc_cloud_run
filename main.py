@@ -33,7 +33,7 @@ def is_valid_genai_format(data: dict) -> bool:
 class GeminiAnalyzeAPI:
     def __init__(self, project_id: str = "tqm-ai-sandbox", location: str = "us-central1"):
         vertexai.init(project=project_id, location=location)
-        self.model = GenerativeModel("gemini-2.5-flash-preview-04-17")
+        self.model = GenerativeModel("gemini-2.0-flash-001")
 
     def generate_and_parse_json(self, prompt):
         try:
